@@ -41,7 +41,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # creates server s
             #  unpad(receivedMsg, BLOCK_SIZE)
             decodedMsg = data.decode('utf-8').strip()
             #  print('received ciphertext is: {}'.format(data.decode('utf-8', 'ignore')))
-            #  print('received plaintext is: {}'.format(decodedMsg))
+            print('received message from client: '.format(decodedMsg))
             #  print('******************')
             nonencryptedticketTGS = string1 + a_tg_serverKey + client_id + networkAddress + a_tg_server_id +\
                 timestamp2.__str__() + lifetime2.__str__()
@@ -60,17 +60,35 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # creates server s
             #  print('Sent plaintext is: {}'.format(plaintext1))
             #  print('Sent ciphertext is: {}'.format(msg.decode('utf-8', 'ignore')))
             print('******************')
-            authenticatorData = client.recv(64) #  might need to make larger input size and just split to rid of space
-            timestamp4 = time.time()
-            nonencryptedticketV = string1 + std_serverKey + client_id + networkAddress + std_server_id +\
-                timestamp4.__str__() + lifetime4.__str__()
-            nonencryptedticketVEncoded = nonencryptedticketV.encode('utf-8')
-            cipher2 = DES.new(std_serverKey.encode('utf-8'), DES.MODE_ECB)
-            encryptedticketV = cipher2.encrypt(pad(nonencryptedticketVEncoded, BLOCK_SIZE))
-            plaintext2 = string1 + std_serverKey + std_server_id + timestamp4.__str__() + encryptedticketV.__str__()
-            plaintext2Encoded = plaintext2.encode('utf-8')
+            receivedData = client.recv(64) #  might need to make larger input size and just split to rid of space
+            receivedDataDecoded = receivedData.decode('utf-8')
+            ticketAndAuthenticatorData = {receivedDataDecoded.replace(std_server_id, '')}
             masterKeyCandTGS = string1 + a_tg_serverKey
-            cipher3 = DES.new(masterKeyCandTGS.encode('utf-8'), DES.MODE_ECB)
-            messageForClient = cipher3.encrypt(pad(plaintext2Encoded, BLOCK_SIZE))
-            client.sendall(messageForClient)
+            cipherTicketTGS = DES.new(a_tg_serverKey.encode('utf-8'), DES.MODE_ECB)
+            cipherAuthenticator = DES.new(masterKeyCandTGS.encode('utf-8'), DES.MODE_ECB)
+            decryptedTicketAndAuthenticator = cipherTicketTGS.decrypt(ticketAndAuthenticatorData.__str__().
+                                                                      encode('utf-8'))
+            decodedTicketAndAuthenticator = decryptedTicketAndAuthenticator.decode('utf-8')
+            truncTicketTGS = {decodedTicketAndAuthenticator.replace(masterKeyCandTGS, '').replace(client_id, '').
+                              replace(networkAddress, '').replace(a_tg_server_id, '')}
+            ticketTS = truncTicketTGS[0:10]
+            convTicket = ticketTS.__str__()
+            ticketTSAsInt = int(convTicket)
+            currentUnixTime = time.time()
+            if currentUnixTime - ticketTSAsInt < lifetime2:
+                print('TGS ticket is valid.')
+                timestamp4 = time.time()
+                nonencryptedticketV = string1 + std_serverKey + client_id + networkAddress + std_server_id + \
+                    timestamp4.__str__() + lifetime4.__str__()
+                nonencryptedticketVEncoded = nonencryptedticketV.encode('utf-8')
+                cipher2 = DES.new(std_serverKey.encode('utf-8'), DES.MODE_ECB)
+                encryptedticketV = cipher2.encrypt(pad(nonencryptedticketVEncoded, BLOCK_SIZE))
+                plaintext2 = string1 + std_serverKey + std_server_id + timestamp4.__str__() + encryptedticketV.__str__()
+                plaintext2Encoded = plaintext2.encode('utf-8')
+                cipher3 = DES.new(masterKeyCandTGS.encode('utf-8'), DES.MODE_ECB)
+                messageForClient = cipher3.encrypt(pad(plaintext2Encoded, BLOCK_SIZE))
+                client.sendall(messageForClient)
+            else:
+                print('Invalid TGS ticket.')
+
 

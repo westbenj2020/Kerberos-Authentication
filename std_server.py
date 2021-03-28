@@ -43,10 +43,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s1:  # creates server 
             #  extract ts5 from client authenticator
             timestamp5 = decodedData[-10:]
             timestamp5asint = int(timestamp5)
-            timestampNewasint = timestamp5asint + 1
-            newTimestamp = str(timestamp5asint)
-            cipher1 = DES.new(masterKeyCandV.encode('utf-8'), DES.MODE_ECB)
-            mutualAuthMessage = cipher1.encrypt(pad(newTimestamp.encode('utf-8'), BLOCK_SIZE))
+            currentUnixTime = time.time()
+            print('Received message from client: {}'.format(decodedData))
+            if currentUnixTime - timestamp5asint < lifetime4:
+                print('Ticket V is valid.')
+                timestampNewasint = timestamp5asint + 1
+                newTimestamp = str(timestamp5asint)
+                cipher1 = DES.new(masterKeyCandV.encode('utf-8'), DES.MODE_ECB)
+                mutualAuthMessage = cipher1.encrypt(pad(newTimestamp.encode('utf-8'), BLOCK_SIZE))
+                client.sendall(mutualAuthMessage)
+            else:
+                print('Ticket V is invalid.')
+
         
 
 

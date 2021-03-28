@@ -41,16 +41,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # references creat
             #  msgWithHMACEncoded = msgWithHMAC.encode('utf-8')
             #  msg = cipher.encrypt(pad(msgWithHMACEncoded, BLOCK_SIZE))  # encrypts plaintext
             s.sendall(plaintext1Encoded)  # sends encrypted message to server
-            print('plain message is: {}'.format(plaintext1))
+            #  print('plain message is: {}'.format(plaintext1))
             cipher1 = DES.new(string1.encode('utf-8'), DES.MODE_ECB)
             data = s.recv(64)  # receives data from server socket - 1024 byte limit
             decryptedData = cipher1.decrypt(data)  # stores decoded byte data as string
             unpad(decryptedData, BLOCK_SIZE)
             decodedData = decryptedData.decode('utf-8').strip()
             print('\n******************')
-            print('received ciphertext is: {}'.format(data.decode('utf-8', 'ignore')))  # prints decoded byte data
-            print('received plaintext is: {}'.format(decodedData))
-            print('******************')
+            #  print('received ciphertext is: {}'.format(data.decode('utf-8', 'ignore')))  # prints decoded byte data
+            print('received plaintext from authentication server: {}'.format(decodedData))
             #  extract tgs ticket to send back to tgs server
             ticketTGS = {decodedData.replace(string1, '').replace(a_tg_serverKey, '').replace(a_tg_server_id, '')
                          .replace(lifetime2.__str__(), '')}
@@ -58,6 +57,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # references creat
             for char in ticketTGS:
                 if char.isdigit():
                     timestamp2.__add__(char)
+                    ticketTGS.remove(char)
+            print('received ticket from authentication server: {}'.format(ticketTGS))
+            print('\n*******************')
             timestamp3 = time.time()
             authenticatorContents = client_id + networkAddress + timestamp3.__str__()
             authenticatorContentsEncoded = authenticatorContents.encode('utf-8')
@@ -77,16 +79,34 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # references creat
             for char in ticketV:
                 if char.isdigit():
                     timestamp4.__add__(char)
+                    ticketV.remove(char)
+            print('Received plaintext from ticket-granting server: {}'.format(decodedData1))
+            print('Received Ticket V from ticket-granting server: {}'.format(ticketV))
             #  whats left of ticketV is ticketV.
             #  create second client authenticator
             timestamp5 = time.time()
+            timestamp5PlusOne = timestamp5 + 1
             secondAuthenticatorContents = string1 + std_serverKey + client_id + networkAddress + timestamp5.__str__()
             secondAuthenticatorContentsEncoded = secondAuthenticatorContents.encode('utf-8')
             masterKeyCandV = string1 + std_serverKey
             cipher4 = DES.new(masterKeyCandV.encode('utf-8'), DES.MODE_ECB)
             secondClientAuthenticator = cipher4.encrypt(pad(secondAuthenticatorContentsEncoded, BLOCK_SIZE))
             clientTostdServerMessage = ticketV.__str__() + secondClientAuthenticator.__str__()
-            #  now send to std server
+            s1.sendall(clientTostdServerMessage.encode('utf-8'))
+            cipher5 = DES.new(masterKeyCandV.encode('utf-8'), DES.MODE_ECB)
+            data2 = s1.recv(64)
+            decryptedData2 = cipher5.decrypt(data2)
+            unpad(decryptedData2, BLOCK_SIZE)
+            decodedData2 = decryptedData2.decode('utf-8').strip()
+            print('Received message from Server V: {}'.format(decodedData2))
+            if decodedData2 == timestamp5PlusOne:
+                print('Server V is validated.')
+            else:
+                print('Server V could not be validated.')
+
+
+
+
 
 
 
